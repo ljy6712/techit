@@ -1,12 +1,12 @@
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.views.generic.list import ListView
 from django.contrib.auth.decorators import login_required
 
 from .models import Post
 
 def index(request):
-    post_list = Post.objects.filter(writer = request.user)
+    post_list = Post.objects.all().order_by('-created_at')
     context = {
         'post_list':post_list
     }
@@ -19,9 +19,12 @@ def post_list_view(request):
     }
     return render(request, 'posts/post_list.html', context)
 
-
+@login_required
 def post_delete_view(request, id):
-    post = get_object_or_404(Post, id=id)
+    post = get_object_or_404(Post, id=id, writer=request.user)
+    # if request.user != post.writer:
+    #     raise Http404('잘못된 접근입니다.')
+    
     if request.method =='GET':
         context = {
             'post':post
@@ -33,13 +36,16 @@ def post_delete_view(request, id):
 
 
 def post_detail_view(request, id):
-    post = Post.objects.get(id=id)
+    try:
+        post = Post.objects.get(id=id)
+    except Post.DoesNotExist:
+        return redirect('index')
     context = {
         'post':post
     }
     return render(request, 'posts/post_detail.html', context)
 
-
+@login_required
 def post_create_view(request):
     if request.method == 'GET':
         return render(request, 'posts/post_form.html')
@@ -53,9 +59,11 @@ def post_create_view(request):
         )
         return redirect('index')
 
-
+@login_required
 def post_update_view(request, id):
-    post = Post.objects.get(id = id)
+    #post = Post.objects.get(id = id)
+    post = get_object_or_404(Post, id=id, writer = request.user)
+
     if request.method == 'GET':
         context = {
             'post' : post
@@ -68,6 +76,7 @@ def post_update_view(request, id):
         if new_image:
             post.image.delete()
             post.image = new_image
+            
         post.content = content
         post.save()
         return redirect('posts:post-detail', post.id)

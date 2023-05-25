@@ -4,6 +4,7 @@ from django.views.generic.list import ListView
 from django.contrib.auth.decorators import login_required
 
 from .models import Post
+from .forms import PostBaseForm, PostCreateForm
 
 def index(request):
     post_list = Post.objects.all().order_by('-created_at')
@@ -36,14 +37,18 @@ def post_delete_view(request, id):
 
 
 def post_detail_view(request, id):
-    try:
-        post = Post.objects.get(id=id)
-    except Post.DoesNotExist:
-        return redirect('index')
-    context = {
-        'post':post
-    }
-    return render(request, 'posts/post_detail.html', context)
+    if request.method=='GET':
+        if request.user.is_authenticated:
+            try:
+                post = Post.objects.get(id=id)
+            except Post.DoesNotExist:
+                return redirect('index')
+            context = {
+                'post':post
+            }
+            return render(request, 'posts/post_detail.html', context)
+        else:
+            return redirect('accounts:login')
 
 @login_required
 def post_create_view(request):
@@ -57,6 +62,24 @@ def post_create_view(request):
             content = content,
             writer = request.user
         )
+        return redirect('index')
+    
+def post_create_form_view(request):
+    if request.method == 'GET':
+        form = PostCreateForm()
+        context = {'form': form}
+        return render(request, 'posts/post_form2.html', context)
+    else:
+        form = PostBaseForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            Post.objects.create(
+                image=form.cleaned_data['image'],
+                content = form.cleaned_data['content'],
+                writer=request.user,
+            )
+        else:
+            return redirect('posts:post-create')
         return redirect('index')
 
 @login_required
